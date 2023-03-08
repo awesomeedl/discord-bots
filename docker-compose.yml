@@ -1,0 +1,13 @@
+version: '3.4'
+
+services:
+  gpt_bot:
+    image: awesomeedl/discordbotchatgpt:latest
+    build: discord-bot-gpt/
+    env_file:
+      - .env
+  helper_bot:
+    image: awesomeedl/discordbothelper:latest
+    build: discord-bot-helper/
+    env_file:
+      - .env
