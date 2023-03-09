@@ -7,10 +7,12 @@ OPENAI_MODEL = os.getenv('OPENAI_MODEL')
 
 async def handle_response(message: str, chat_history: list[dict[str, str]]) -> str:
 
-    completion = await openai.ChatCompletion.acreate(
-        model=OPENAI_MODEL,
-        messages=chat_history + [{"role": "user", "content": message}]
-    )
+    try:
+        completion = await openai.ChatCompletion.acreate(
+            model=OPENAI_MODEL,
+            messages=chat_history + [{"role": "user", "content": message}])
+    except Exception:
+        raise
 
     return completion.choices[0].message.content
 
