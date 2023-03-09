@@ -6,7 +6,7 @@ from interactions import \
     Guild, Member
 import os
 
-GPT_BOT_NAME = 'gpt-bot-dev'
+GPT_BOT_NAME = os.getenv('GPT_BOT_NAME')
 
 # Myself
 bot = interactions.Client(token=os.getenv('HELPER_BOT_TOKEN'))
@@ -39,10 +39,10 @@ async def create_gpt_thread(
         f'{member.username} - ChatGPT',
         type=ChannelType.PRIVATE_THREAD)
 
-    gpt_bot = (await guild.search_members(GPT_BOT_NAME))[0]
-
-    if not gpt_bot:
-        raise Exception('GPT bot not in server')
+    try:
+        gpt_bot = (await guild.search_members(GPT_BOT_NAME))[0]
+    except IndexError:
+        print(f'GPT Bot not found. \nLooking for: {GPT_BOT_NAME}')
 
     await gpt_thread.add_member(member)
     await gpt_thread.add_member(gpt_bot)
