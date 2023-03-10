@@ -64,16 +64,13 @@ async def reset_chat(component_context: ComponentContext) -> None:
     await gpt_thread.delete()
     gpt_thread = await create_gpt_thread(guild, user)
 
-    await component_context.send(
-        f"Chat successfully reset {gpt_thread.mention}",
-        ephemeral=True)
+    await component_context.disable_all_components(content=f"Chat successfully reset {gpt_thread.mention}")
+
 
 
 @bot.component('deny')
 async def do_nothing(component_context: ComponentContext) -> None:
-    await component_context.send(
-        "Ok. If you want to reset the chat, use the command `/chat close`",
-        ephemeral=True)
+    await component_context.disable_all_components(content="Ok. If you want to reset the chat, use the command `/chat close`")
 
 
 @bot.command(name='chat')
