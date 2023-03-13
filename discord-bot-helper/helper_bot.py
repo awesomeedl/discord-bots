@@ -5,8 +5,10 @@ from interactions import \
     Channel, ChannelType, \
     Guild, Member
 import os
+import requests
 
 GPT_BOT_NAME = os.getenv('GPT_BOT_NAME')
+MANGA_POST_URL = os.getenv('MANGA_POST_URL')
 
 # Myself
 bot = interactions.Client(token=os.getenv('HELPER_BOT_TOKEN'))
@@ -136,5 +138,17 @@ async def new_chat(command_context: CommandContext, base_res: BaseResult) -> Non
         await command_context.send(
             f'Room created! Enjoy your chat with ChatGPT {gpt_thread.mention}',
             ephemeral=True)
+
+@bot.command(
+    name='subscribe_manga',
+    description='Subscribe a manga on Manhuagui',
+)
+@interactions.option(
+    name='manga id',
+    type=interactions.OptionType.INTEGER
+)
+async def subscribe_manga(command_context: CommandContext) -> None:
+    await requests.post(url=MANGA_POST_URL, json={})
+
 
 bot.start()
