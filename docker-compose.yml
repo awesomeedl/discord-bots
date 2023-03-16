@@ -11,3 +11,8 @@ services:
     build: discord-bot-helper/
     env_file:
       - .env
+  dev_bot:
+    build: dev-bot/
+    env_file:
+      - .env
+
