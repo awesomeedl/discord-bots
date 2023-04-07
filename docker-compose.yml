@@ -6,13 +6,13 @@ services:
     build: discord-bot-gpt/
     env_file:
       - .env
-  helper_bot:
-    image: awesomeedl/discordbothelper:latest
-    build: discord-bot-helper/
-    env_file:
-      - .env
-  dev_bot:
-    build: dev-bot/
-    env_file:
-      - .env
+#  helper_bot:
+#    image: awesomeedl/discordbothelper:latest
+#    build: discord-bot-helper/
+#    env_file:
+#      - .env
+#  dev_bot:
+#    build: dev-bot/
+#    env_file:
+#      - .env
 

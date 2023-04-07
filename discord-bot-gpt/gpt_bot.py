@@ -6,7 +6,6 @@ from interactions import Button, ButtonStyle, \
     Channel, ChannelType, Message, MessageType
 import response_handler
 
-char_limit = 1900
 max_past_conversation = 10
 
 # Myself
@@ -25,53 +24,20 @@ async def get_message_history(channel: Channel) -> list[dict[str, str]]:
     return list(reversed(message_history))
 
 
+
+
+
+
 async def send_reply(channel: Channel, message: Message) -> None:
     try:
         async with channel.typing:
             message_history = await get_message_history(channel)
+
             response = await response_handler.handle_response(message.content, message_history)
 
-            # Response is ok, send directly
-            if len(response) <= char_limit:
-                await message.reply(response)
-                return
+            for chunk in response:
+                await message.reply(chunk)
 
-            # Response is too long
-            # Split the response into smaller chunks of no more than 1900 characters each(Discord limit is 2000 per chunk)
-            if "```" not in response:
-                response_chunks = [response[i:i + char_limit] for i in range(0, len(response), char_limit)]
-
-                for chunk in response_chunks:
-                    await message.reply(chunk)
-                return
-
-            # Code block exists
-            parts = response.split("```")
-
-            for i in range(0, len(parts)):
-                if i % 2 == 0:  # indices that are even are not code blocks
-
-                    await message.reply(parts[i])
-
-                # Send the code block in a separate message
-                else:  # Odd-numbered parts are code blocks
-                    code_block = parts[i].split("\n")
-                    formatted_code_block = ""
-                    for line in code_block:
-                        while len(line) > char_limit:
-                            # Split the line at the 50th character
-                            formatted_code_block += line[:char_limit] + "\n"
-                            line = line[char_limit:]
-                        formatted_code_block += line + "\n"  # Add the line and separate with new line
-
-                    # Send the code block in a separate message
-                    if len(formatted_code_block) > char_limit + 100:
-                        code_block_chunks = [formatted_code_block[i:i + char_limit]
-                                             for i in range(0, len(formatted_code_block), char_limit)]
-                        for chunk in code_block_chunks:
-                            await message.reply("```" + chunk + "```")
-                    else:
-                        await message.reply("```" + formatted_code_block + "```")
     except Exception as e:
         await message.reply(f"Something went wrong, please try again.\n\n>>> {e}")
 
@@ -106,6 +72,18 @@ deny = Button(
     custom_id="deny"
 )
 
+new_chat_btn = Button(
+    style=ButtonStyle.SUCCESS,
+    label="New Chat",
+    custom_id="new_chat_btn"
+)
+
+close_chat_btn = Button(
+    style=ButtonStyle.DANGER,
+    label="Close Chat",
+    custom_id="close_chat_btn"
+)
+
 
 async def create_gpt_thread(
         guild: Guild,
@@ -134,7 +112,6 @@ async def create_gpt_thread(
 
 @bot.component('confirm')
 async def reset_chat(component_context: ComponentContext) -> None:
-
     guild = await component_context.get_guild()
     threads = await guild.get_all_active_threads()
     user = component_context.author
@@ -153,6 +130,64 @@ async def reset_chat(component_context: ComponentContext) -> None:
 @bot.component('deny')
 async def do_nothing(component_context: ComponentContext) -> None:
     await component_context.edit(content="Ok. If you want to reset the chat, use the command `/chat close`", components=[])
+
+
+@bot.component('new_chat_btn')
+async def new_chat(component_context: ComponentContext) -> None:
+    guild = await component_context.get_guild()
+    threads = await guild.get_all_active_threads()
+    user = component_context.author
+
+    gpt_thread = next((c for c in threads if c.name == f'{user.username} - ChatGPT'), None)
+    if gpt_thread:  # thread already exists:
+        await component_context.send(
+            f'There is an existing chat already: {gpt_thread.mention}\nDo you want to delete it and start over?',
+            components=interactions.spread_to_rows(confirm, deny),
+            ephemeral=True)
+    else:
+        gpt_thread = await create_gpt_thread(guild, user)
+
+        await component_context.send(
+            f'Room created! Enjoy your chat with ChatGPT {gpt_thread.mention}',
+            ephemeral=True)
+
+
+@bot.component('close_chat_btn')
+async def close_chat(component_context: ComponentContext) -> None:
+    guild = await component_context.get_guild()
+    threads = await guild.get_all_active_threads()
+    user = component_context.author
+
+    gpt_thread = next((c for c in threads if c.name == f'{user.username} - ChatGPT'), None)
+
+    if gpt_thread:
+        await gpt_thread.delete()
+        await component_context.send(
+            'Chat successfully deleted',
+            ephemeral=True)
+    else:
+        await component_context.send(
+            'I didn\'t find an active chat with ChatGPT',
+            ephemeral=True)
+
+
+# @bot.command(name='send_welcome')
+# async def send_welcome(command_context: CommandContext):
+#     channel = await command_context.get_channel()
+#
+#     await channel.send(
+#         embeds=interactions.Embed(
+#             color=0xe6b400,
+#             title="Welcome to the ChatGPT Channel",
+#             description="\n\nUse the buttons below to start a new chat with ChatGPT",
+#             thumbnail=interactions.EmbedImageStruct(
+#                 url="https://uxwing.com/wp-content/themes/uxwing/download/brands-and-social-media/chatgpt-icon.png"
+#             )
+#         ),
+#         components=interactions.spread_to_rows(new_chat_btn, close_chat_btn)
+#     )
+#
+#     await command_context.send("message sent", ephemeral=True)
 
 
 @bot.command(name='chat')
@@ -184,7 +219,7 @@ async def base_chat(command_context: CommandContext):
     name='close',
     description='End the current chat with ChatGPT'
 )
-async def close_chat(command_context: CommandContext, base_res: BaseResult) -> None:
+async def chat_close(command_context: CommandContext, base_res: BaseResult) -> None:
     gpt_thread = base_res.result['gpt_thread']
 
     if gpt_thread:
@@ -202,14 +237,14 @@ async def close_chat(command_context: CommandContext, base_res: BaseResult) -> N
     name='new',
     description='Start a new chat with ChatGPT',
 )
-async def new_chat(command_context: CommandContext, base_res: BaseResult) -> None:
+async def chat_new(command_context: CommandContext, base_res: BaseResult) -> None:
     guild = base_res.result['guild']
     gpt_thread = base_res.result['gpt_thread']
     user = base_res.result['user']
 
     if gpt_thread:  # thread already exists:
         await command_context.send(
-            'There is an existing chat with ChatGPT already. Do you want to delete it and start over?',
+            f'There is an existing chat already: {gpt_thread.mention}\nDo you want to delete it and start over?',
             components=interactions.spread_to_rows(confirm, deny),
             ephemeral=True)
     else:
@@ -220,29 +255,29 @@ async def new_chat(command_context: CommandContext, base_res: BaseResult) -> Non
             ephemeral=True)
 
 
-@bot.command(description="Generate an image based on the prompt")
-@interactions.option("Prompt for the image")
-@interactions.option("The resolution of the image",
-                     choices=[
-                         interactions.Choice(name="High", value="1024x1024"),
-                         interactions.Choice(name="Medium", value="512x512"),
-                         interactions.Choice(name="Low", value="256x256")
-                     ])
-async def generate_image(command_context: CommandContext, prompt: str, resolution: str) -> None:
-    await command_context.defer(ephemeral=True)
-    try:
-        img_url = await response_handler.handle_image_response(prompt, resolution)
-    except Exception as e:
-        await command_context.send(f'Something went wrong, please try again.\n\n>>> {e}', ephemeral=True)
-
-    await command_context.send(
-        embeds=interactions.Embed(
-            title=prompt,
-            image=interactions.EmbedImageStruct(
-                url=img_url
-            )
-        ),
-        ephemeral=True
-    )
+# @bot.command(description="Generate an image based on the prompt")
+# @interactions.option("Prompt for the image")
+# @interactions.option("The resolution of the image",
+#                      choices=[
+#                          interactions.Choice(name="High", value="1024x1024"),
+#                          interactions.Choice(name="Medium", value="512x512"),
+#                          interactions.Choice(name="Low", value="256x256")
+#                      ])
+# async def generate_image(command_context: CommandContext, prompt: str, resolution: str) -> None:
+#     await command_context.defer(ephemeral=True)
+#     try:
+#         img_url = await response_handler.handle_image_response(prompt, resolution)
+#     except Exception as e:
+#         await command_context.send(f'Something went wrong, please try again.\n\n>>> {e}', ephemeral=True)
+#
+#     await command_context.send(
+#         embeds=interactions.Embed(
+#             title=prompt,
+#             image=interactions.EmbedImageStruct(
+#                 url=img_url
+#             )
+#         ),
+#         ephemeral=True
+#     )
 
 bot.start()
